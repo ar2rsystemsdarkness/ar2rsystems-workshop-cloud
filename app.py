@@ -19,6 +19,17 @@ def money(n):
     except Exception:
         return "$0.00"
 
+def as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+def as_list(value):
+    return value if isinstance(value, list) else []
+
+def safe_str(value):
+    if value is None:
+        return ""
+    return str(value)
+
 def read_json(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -103,6 +114,11 @@ def layout(title, body, active="tickets"):
     """
     return f'<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>{STYLE}</head><body>{nav}<main>{body}</main></body></html>'
 
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(os.path.join(BASE, "static"), "ar2rsystems_logo.png")
+
 @app.route("/static/<path:name>")
 def static_files(name):
     return send_from_directory(os.path.join(BASE, "static"), name)
@@ -127,7 +143,7 @@ def tickets_page():
     tickets = all_json(TICKETS)
     rows = ""
     for t in tickets:
-        eq = t.get("equipo", {})
+        eq = as_dict(t.get("equipo"))
         rows += f"""
         <tr>
           <td><b>{html.escape(t.get('ticket_id',''))}</b><br><span class="small">{html.escape(t.get('created_at',''))}</span></td>
@@ -155,10 +171,10 @@ def ticket_page(tid):
     t = get_ticket(tid)
     if not t:
         return layout("No encontrado", "<h1>No encontre el ticket</h1>")
-    eq = t.get("equipo", {})
-    disks = "".join([f"<tr><td>{html.escape(str(d.get('modelo','')))}</td><td>{html.escape(str(d.get('tipo','')))}</td><td>{html.escape(str(d.get('gb','')))}</td></tr>" for d in t.get("discos", [])])
-    drivers = "".join([f"<tr><td>{html.escape(str(d.get('dispositivo','')))}</td><td>{html.escape(str(d.get('hardwareID','')))}</td></tr>" for d in t.get("drivers", [])])
-    recs = "".join([f"<li>{html.escape(str(r))}</li>" for r in t.get("recomendaciones", [])])
+    eq = as_dict(t.get("equipo"))
+    disks = "".join([f"<tr><td>{html.escape(str(as_dict(d).get('modelo','')))}</td><td>{html.escape(str(as_dict(d).get('tipo','')))}</td><td>{html.escape(str(as_dict(d).get('gb','')))}</td></tr>" for d in as_list(t.get("discos"))])
+    drivers = "".join([f"<tr><td>{html.escape(str(as_dict(d).get('dispositivo','')))}</td><td>{html.escape(str(as_dict(d).get('hardwareID','')))}</td></tr>" for d in as_list(t.get("drivers"))])
+    recs = "".join([f"<li>{html.escape(str(r))}</li>" for r in as_list(t.get("recomendaciones"))])
     body = f"""
     <h1>Ticket {html.escape(tid)}</h1>
     <div class="card"><b>Equipo:</b> {html.escape(eq.get('marca',''))} {html.escape(eq.get('modelo',''))}<br><b>Serie:</b> {html.escape(eq.get('serie',''))}<br><b>CPU:</b> {html.escape(eq.get('cpu',''))}<br><b>RAM:</b> {html.escape(str(eq.get('ram_instalada','')))} GB<br><b>Score:</b> {html.escape(str(t.get('score','')))}/100</div>
@@ -173,13 +189,13 @@ def ticket_page(tid):
 def quote_page():
     tid = request.args.get("ticket")
     t = get_ticket(tid) if tid else None
-    eq = t.get("equipo", {}) if t else {}
+    eq = as_dict(t.get("equipo")) if t else {}
     cliente = t.get("cliente","") if t else ""
     whatsapp = t.get("whatsapp","") if t else ""
     equipo = (eq.get("marca","") + " " + eq.get("modelo","")).strip()
     falla = ""
     if t:
-        falla = f"Ticket {t.get('ticket_id')} Score {t.get('score')}/100. " + " ".join(t.get("recomendaciones", []))
+        falla = f"Ticket {t.get('ticket_id')} Score {t.get('score')}/100. " + " ".join([str(x) for x in as_list(t.get("recomendaciones"))])
     js_ticket = json.dumps(t, ensure_ascii=False) if t else "null"
     body = f"""
     <h1>{'Cotizar ticket' if t else 'Cotizacion manual'}</h1>
@@ -231,7 +247,7 @@ def settings_page():
     <h1>Scanner cloud</h1>
     <div class='card'>
       <p>Pon esta URL en el scanner:</p>
-      <h2>https://TU-APP.onrender.com</h2>
+      <h2>https://ar2rsystems-workshop-cloud.onrender.com</h2>
       <p>Mientras pruebas local:</p>
       <h2>http://localhost:5050</h2>
     </div>
